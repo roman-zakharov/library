@@ -431,7 +431,51 @@ def update_comment(comment_id):
         return jsonify({'success': True})
     return jsonify({'success': False}), 400
 
+
 @app.route('/delete_books', methods=['POST'])
+@login_required
+def delete_books():
+    book_ids = request.form.getlist('book_ids[]')
+    
+    # Отладочный вывод
+    print(f"Получены ID книг для удаления: {book_ids}")
+    
+    if not book_ids:
+        flash('Выберите книги для удаления', 'error')
+        return redirect(url_for('index'))
+    
+    # Преобразуем строковые ID в целые числа
+    try:
+        book_ids = [int(book_id) for book_id in book_ids]
+    except ValueError:
+        flash('Неверный формат ID книг', 'error')
+        return redirect(url_for('index'))
+    
+    try:
+        # Сначала удаляем связанные комментарии
+        Comment.query.filter(Comment.book_id.in_(book_ids)).delete(synchronize_session=False)
+        
+        # Затем удаляем сами книги, убедившись, что они принадлежат текущему пользователю
+        deleted_count = Book.query.filter(
+            Book.id.in_(book_ids), 
+            Book.user_id == current_user.id
+        ).delete(synchronize_session=False)
+        
+        db.session.commit()
+        
+        if deleted_count > 0:
+            flash(f'Успешно удалено {deleted_count} книг', 'success')
+            log_action(current_user.id, 'Удаление книг', f'Удалено {deleted_count} книг')
+        else:
+            flash('Нет прав на удаление выбранных книг или книги не найдены', 'warning')
+    except Exception as e:
+        db.session.rollback()
+        print(f"Ошибка при удалении книг: {str(e)}")
+        flash(f'Произошла ошибка при удалении книг: {str(e)}', 'error')
+    
+    return redirect(url_for('index'))
+
+""" @app.route('/delete_books', methods=['POST'])
 @login_required
 def delete_books():
     book_ids = request.form.getlist('book_ids[]')
@@ -456,7 +500,7 @@ def delete_books():
         flash('Произошла ошибка при удалении книг')
     
     return redirect(url_for('index'))
-
+ """
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
