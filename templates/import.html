@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Импорт книг - Библиотека{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-body">
+            <h2 class="card-title">Импорт книг</h2>
+            <p class="card-text">
+                Поддерживаются файлы в формате CSV или Excel (.xlsx).<br>
+                Файл должен содержать следующие колонки:
+            </p>
+            <ul>
+                <li><strong>Название</strong> - название книги</li>
+                <li><strong>Автор</strong> - автор книги</li>
+                <li><strong>Комментарий</strong> - описание или комментарий к книге</li>
+            </ul>
+            <form method="POST" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <label for="file" class="form-label">Выберите файл</label>
+                    <input type="file" class="form-control" id="file" name="file" accept=".csv,.xlsx" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Импортировать</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %} 

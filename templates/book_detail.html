@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+
+{% block title %}{{ book.title }} - Библиотека{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-body">
+            <h2 class="card-title">
+                <span class="editable" data-field="title" data-book-id="{{ book.id }}">{{ book.title }}</span>
+            </h2>
+            <h5 class="card-subtitle mb-3">
+                <span class="editable" data-field="author" data-book-id="{{ book.id }}">{{ book.author }}</span>
+            </h5>
+            <p class="card-text">
+                <span class="editable" data-field="description" data-book-id="{{ book.id }}">{{ book.description or 'Нет описания' }}</span>
+            </p>
+            <p class="card-text">
+                <strong>Рейтинг:</strong>
+                <div class="rating-stars">
+                    {% for i in range(5) %}
+                    <span class="star {% if i < book.rating %}filled{% endif %}" 
+                          data-rating="{{ i + 1 }}" 
+                          data-book-id="{{ book.id }}">★</span>
+                    {% endfor %}
+                </div>
+            </p>
+        </div>
+    </div>
+
+    {% if current_user.is_authenticated %}
+    <div class="card mt-4">
+        <div class="card-body">
+            <h5 class="card-title">Добавить комментарий</h5>
+            <form method="POST">
+                <div class="mb-3">
+                    <label for="content" class="form-label">Комментарий</label>
+                    <textarea class="form-control" id="content" name="content" rows="3" required></textarea>
+                </div>
+                <div class="mb-3">
+                    <label for="rating" class="form-label">Оценка</label>
+                    <div class="rating-stars">
+                        {% for i in range(5) %}
+                        <span class="star" data-rating="{{ i + 1 }}">★</span>
+                        {% endfor %}
+                    </div>
+                    <input type="hidden" id="rating" name="rating" value="0">
+                </div>
+                <button type="submit" class="btn btn-primary">Отправить</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="card mt-4">
+        <div class="card-body">
+            <h5 class="card-title">Комментарии</h5>
+            {% for comment in book.comments %}
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">{{ comment.user.username }} - {{ comment.date_posted.strftime('%d.%m.%Y %H:%M') }}</h6>
+                    <p class="card-text editable" data-field="content" data-comment-id="{{ comment.id }}">{{ comment.content }}</p>
+                    <div class="rating-stars">
+                        {% for i in range(5) %}
+                        <span class="star {% if i < comment.rating %}filled{% endif %}" 
+                              data-rating="{{ i + 1 }}" 
+                              data-comment-id="{{ comment.id }}">★</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <p class="card-text">Пока нет комментариев</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<style>
+.editable {
+    cursor: pointer;
+    padding: 2px 5px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.editable:hover {
+    background-color: #f8f9fa;
+}
+
+.editable.editing {
+    background-color: #fff;
+    border: 1px solid #ced4da;
+    padding: 2px 5px;
+    border-radius: 4px;
+    width: 100%;
+    display: block;
+}
+
+.editable[data-field="description"] {
+    display: block;
+    min-height: 100px;
+}
+
+.editable[data-field="description"].editing {
+    min-height: 100px;
+    resize: vertical;
+}
+
+.rating-stars {
+    display: inline-block;
+    font-size: 24px;
+    cursor: pointer;
+}
+
+.star {
+    color: #ddd;
+    transition: color 0.2s;
+}
+
+.star.filled {
+    color: #ffd700;
+}
+
+.star:hover,
+.star:hover ~ .star {
+    color: #ffd700;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Обработка редактируемых полей
+    const editableFields = document.querySelectorAll('.editable');
+    
+    editableFields.forEach(field => {
+        field.addEventListener('dblclick', function() {
+            const currentValue = this.textContent;
+            const fieldType = this.dataset.field;
+            const id = this.dataset.bookId || this.dataset.commentId;
+            
+            let input;
+            if (fieldType === 'description') {
+                input = document.createElement('textarea');
+                input.value = currentValue;
+                input.style.width = '100%';
+                input.style.minHeight = '100px';
+            } else {
+                input = document.createElement('input');
+                input.type = 'text';
+                input.value = currentValue;
+                input.style.width = '100%';
+            }
+            
+            this.textContent = '';
+            this.appendChild(input);
+            this.classList.add('editing');
+            input.focus();
+            
+            const updateField = () => {
+                const newValue = input.value;
+                const endpoint = this.dataset.bookId ? 
+                    `/book/${id}/update` : 
+                    `/comment/${id}/update`;
+                
+                fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        field: fieldType,
+                        value: newValue
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        this.textContent = newValue;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    this.textContent = currentValue;
+                })
+                .finally(() => {
+                    this.classList.remove('editing');
+                });
+            };
+            
+            input.addEventListener('blur', updateField);
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    updateField();
+                }
+            });
+        });
+    });
+
+    // Обработка звездочек рейтинга
+    const ratingStars = document.querySelectorAll('.rating-stars .star');
+    
+    ratingStars.forEach(star => {
+        star.addEventListener('click', function() {
+            const rating = this.dataset.rating;
+            const bookId = this.dataset.bookId;
+            const commentId = this.dataset.commentId;
+            
+            if (bookId) {
+                // Обновление рейтинга книги
+                fetch(`/book/${bookId}/update`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        field: 'rating',
+                        value: rating
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updateStars(this.parentElement, rating);
+                    }
+                });
+            } else if (commentId) {
+                // Обновление рейтинга комментария
+                fetch(`/comment/${commentId}/update`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        field: 'rating',
+                        value: rating
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updateStars(this.parentElement, rating);
+                    }
+                });
+            } else {
+                // Установка рейтинга для нового комментария
+                const stars = this.parentElement.querySelectorAll('.star');
+                stars.forEach(s => {
+                    s.classList.toggle('filled', s.dataset.rating <= rating);
+                });
+                document.getElementById('rating').value = rating;
+            }
+        });
+    });
+
+    function updateStars(container, rating) {
+        const stars = container.querySelectorAll('.star');
+        stars.forEach(star => {
+            star.classList.toggle('filled', star.dataset.rating <= rating);
+        });
+    }
+});
+</script>
+{% endblock %} 

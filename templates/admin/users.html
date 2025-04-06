@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block title %}Управление пользователями - Библиотека{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Управление пользователями</h2>
+    
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Имя пользователя</th>
+                            <th>Email</th>
+                            <th>Статус</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr>
+                            <td>{{ user.id }}</td>
+                            <td>
+                                <span class="editable" data-user-id="{{ user.id }}" data-field="username">{{ user.username }}</span>
+                            </td>
+                            <td>
+                                <span class="editable" data-user-id="{{ user.id }}" data-field="email">{{ user.email }}</span>
+                            </td>
+                            <td>
+                                <span class="badge {% if user.is_admin %}bg-danger{% else %}bg-secondary{% endif %}">
+                                    {{ 'Админ' if user.is_admin else 'Пользователь' }}
+                                </span>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-warning reset-password" data-user-id="{{ user.id }}">
+                                    Сбросить пароль
+                                </button>
+                                <button class="btn btn-sm btn-info view-logs" data-user-id="{{ user.id }}">
+                                    Логи
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для просмотра логов -->
+<div class="modal fade" id="logsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Логи пользователя</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Время</th>
+                                <th>Действие</th>
+                                <th>Детали</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logsTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Обработка редактирования полей
+    document.querySelectorAll('.editable').forEach(element => {
+        element.addEventListener('dblclick', function() {
+            const currentValue = this.textContent;
+            const input = document.createElement('input');
+            input.value = currentValue;
+            input.className = 'form-control form-control-sm';
+            
+            input.addEventListener('blur', function() {
+                const newValue = this.value;
+                if (newValue !== currentValue) {
+                    updateUserField(element.dataset.userId, element.dataset.field, newValue);
+                }
+                element.textContent = newValue;
+            });
+            
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    this.blur();
+                }
+            });
+            
+            this.textContent = '';
+            this.appendChild(input);
+            input.focus();
+        });
+    });
+    
+    // Обработка сброса пароля
+    document.querySelectorAll('.reset-password').forEach(button => {
+        button.addEventListener('click', function() {
+            if (confirm('Вы уверены, что хотите сбросить пароль этого пользователя?')) {
+                const userId = this.dataset.userId;
+                fetch(`/admin/reset_password/${userId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Пароль успешно сброшен! Новый пароль: ' + data.new_password);
+                    } else {
+                        alert('Ошибка при сбросе пароля');
+                    }
+                });
+            }
+        });
+    });
+    
+    // Обработка просмотра логов
+    document.querySelectorAll('.view-logs').forEach(button => {
+        button.addEventListener('click', function() {
+            const userId = this.dataset.userId;
+            fetch(`/admin/user_logs/${userId}`)
+                .then(response => response.json())
+                .then(data => {
+                    const tbody = document.getElementById('logsTableBody');
+                    tbody.innerHTML = '';
+                    data.logs.forEach(log => {
+                        tbody.innerHTML += `
+                            <tr>
+                                <td>${new Date(log.timestamp).toLocaleString()}</td>
+                                <td>${log.action}</td>
+                                <td>${log.details}</td>
+                            </tr>
+                        `;
+                    });
+                    new bootstrap.Modal(document.getElementById('logsModal')).show();
+                });
+        });
+    });
+});
+
+function updateUserField(userId, field, value) {
+    fetch(`/admin/update_user/${userId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            field: field,
+            value: value
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) {
+            alert('Ошибка при обновлении данных');
+        }
+    });
+}
+</script>
+{% endblock %} 
