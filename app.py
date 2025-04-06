@@ -199,9 +199,9 @@ def logout():
 @login_required
 def add_book():
     if request.method == 'POST':
-        title = request.form['title']
-        author = request.form['author']
-        rating = int(request.form['rating'])
+        title = request.form.get('title', "New title")
+        author = request.form.get('author', 'new author')
+        rating = int(request.form.get('rating', 0))
         
         book = Book(title=title, author=author, rating=rating, user_id=current_user.id)
         db.session.add(book)
